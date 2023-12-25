@@ -1,0 +1,1 @@
+Signal_dict=  {'LICHSGFIN23DEC525PE': {'Sym': 'LICHSGFIN', 'exp': '23DEC', 'atm_strike': 525, 'Contracttype': 'PE', 'lotsize': 2000, 'Target': 21.6, 'Stop': 8.05, 'tslstep_val': 13.2, 'tslmove_val': 8.65, 't': True, 's': True}}
