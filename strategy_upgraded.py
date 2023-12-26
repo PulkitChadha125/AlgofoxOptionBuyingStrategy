@@ -529,7 +529,8 @@ def condition_order_placement():
                                 "tslmove_val": tslmove_val,
                                 "t": True,
                                 "s": True,
-                                "strategy_mode": mode
+                                "strategy_mode": mode,
+                                "flip":0
                             }
 
                             algofox_symbol = f"{trade_details['Sym']}|{monthlyexp_al}|{trade_details['atm_strike']}|{trade_details['Contracttype']}"
@@ -560,67 +561,213 @@ def condition_order_placement():
     print("Signal_dict= ", Signal_dict)
 
 
-def get_instrument_token(sym, exp, strike, type):
-    global kite
-
-    df = pd.read_csv('Instruments.csv')
-
-    instrument_token = None  # Initialize the instrument token as None
-
-    while instrument_token is None:
-
-        selected_row = df[(df['instrument_type'] == type) &
-                          (df['expiry'].astype(str) == exp) &
-                          (df['strike'].astype(int) == strike) &
-                          (df['tradingsymbol'].str.contains(sym))]
-        # print('selected_row: ',selected_row)
-
-        if not selected_row.empty:
-            instrument_token = selected_row['instrument_token'].values[0]
-        else:
-            print("Instrument token not found. Retrying...")
-
-    # print("instrument_token: ", instrument_token)
-
-    return instrument_token
-
-
 def convert_to_human_readable(df):
     df['date'] = df['date'].dt.strftime('%Y-%m-%d %H:%M:%S')
     return df
 
 
-def get_historical_data(Token, exp, timeframe, strategy_tag, type, strike, RSIPeriod, MAOFOI, MAOFVOl, sym,
-                        supertrend_period, supertrend_multiplier):
+def get_instrument_token (Sym):
+    df=pd.read_csv("Instruments.csv")
+    matching_row = df[df["tradingsymbol"] == Sym]
+    if not matching_row.empty:
+        return matching_row.iloc[0]["instrument_token"]
+    else:
+        return None
+
+
+
+
+def get_historical_data(Token , sym, supertrend_period , supertrend_multiplier):
+
     from_datetime = datetime.now() - timedelta(days=5)  # From last 1 day
     to_datetime = datetime.now()
-
     res = kite.historical_data(instrument_token=Token, from_date=from_datetime, to_date=to_datetime,
-                               interval=timeframe, continuous=False, oi=True)
+                               interval="2minute", continuous=False, oi=True)
     price_data = pd.DataFrame(res)
     price_data = convert_to_human_readable(pd.DataFrame(res))
     price_data["SYMBOL"] = sym
     price_data['date'] = pd.to_datetime(price_data['date'])
-    date_column = price_data['date']
-    colname = f'SUPERT_{int(supertrend_period)}_{supertrend_multiplier}'
-    colname2 = f'SUPERTd_{int(supertrend_period)}_{supertrend_multiplier}'
+    colname = f'SUPERT_{int(supertrend_period)}_{float(supertrend_multiplier)}'
+    colname2 = f'SUPERTd_{int(supertrend_period)}_{float(supertrend_multiplier)}'
 
-    df["Supertrend Values"] = ta.supertrend(high=df['inth'], low=df['intl'], close=df['intc'], length=supertrend_period,
-                                            multiplier=supertrend_multiplier)[colname]
-    df["Supertrend Signal"] = ta.supertrend(high=df['inth'], low=df['intl'], close=df['intc'], length=supertrend_period,
-                                            multiplier=supertrend_multiplier)[colname2]
-
-    # price_data.drop('date', axis=1, inplace=True)
-    #
-    # cols = ['open', 'high', 'low', 'close', 'volume', 'oi', 'SYMBOL']
-    # price_data = price_data[cols]
-    #
+    price_data["Supertrend Values"] = ta.supertrend(high=price_data['high'], low=price_data['low'], close=price_data['close'], length=int(supertrend_period),
+                                            multiplier=float(supertrend_multiplier))[colname]
+    price_data["Supertrend Signal"] = ta.supertrend(high=price_data['high'], low=price_data['low'], close=price_data['close'], length=int(supertrend_period),
+                                            multiplier=float(supertrend_multiplier))[colname2]
 
     return price_data
+def ATM_CE_AND_PE_SYMBOL(ltp,symbol):
+    global monthlyexp
+    try:
+        monthlyexp = credentials_dict.get('monthlyexp')
+        monthlyexp = datetime.strptime(monthlyexp, "%d-%m-%Y")
+        monthlyexp = monthlyexp.strftime("%Y-%m-%d")
+        pf = pd.read_csv("Instruments.csv")
+        filtered_df = pf[(pf['expiry'] == monthlyexp) & (pf['instrument_type'] == 'CE') & (pf["name"]==symbol)]
+        if not filtered_df.empty:
+            filtered_df["strike_diff"] = abs(
+                filtered_df["strike"] - ltp)
+            min_diff_row = filtered_df.loc[filtered_df['strike_diff'].idxmin()]
+        strike=int(min_diff_row["strike"])
+
+        cesymname=min_diff_row["tradingsymbol"]
+        pesymname = cesymname.rsplit('CE', 1)[0] + 'PE'
+        return cesymname,pesymname
+
+    except Exception as e:
+        print(f"ATM_CE_AND_PE_COMBIMED error : {str(e)}")
+def ATM_CE_AND_PE(ltp,symbol):
+    global monthlyexp
+    try:
+        monthlyexp = credentials_dict.get('monthlyexp')
+        monthlyexp = datetime.strptime(monthlyexp, "%d-%m-%Y")
+        monthlyexp = monthlyexp.strftime("%Y-%m-%d")
+        pf = pd.read_csv("Instruments.csv")
+        filtered_df = pf[(pf['expiry'] == monthlyexp) & (pf['instrument_type'] == 'CE') & (pf["name"]==symbol)]
+        if not filtered_df.empty:
+            filtered_df["strike_diff"] = abs(
+                filtered_df["strike"] - ltp)
+            min_diff_row = filtered_df.loc[filtered_df['strike_diff'].idxmin()]
+        strike=int(min_diff_row["strike"])
+
+        cesymname=min_diff_row["tradingsymbol"]
+        pesymname = cesymname.rsplit('CE', 1)[0] + 'PE'
+        return strike
 
 
+    except Exception as e:
+        print(f"ATM_CE_AND_PE_COMBIMED error : {str(e)}")
+
+
+flip=0
 def supertrend_sl(Signal_dict):
-    pass
+    global supertrend_period,supertrend_multiplier,monthlyexp_al,flip
+    for symbol, data in Signal_dict.items():
+
+        if data.get('strategy_mode') == "NFO":
+            print(f"Supertrend calculation started for { data.get('NFOSYM')} ")
+            instoken = get_instrument_token(data.get('NFOSYM'))
+
+            DATAFRAME=get_historical_data(instoken, data.get('NFOSYM'), supertrend_period, supertrend_multiplier)
+            last_supertrend_signal = DATAFRAME['Supertrend Signal'].iloc[-1]
+            second_last_supertrend_signal = DATAFRAME['Supertrend Signal'].iloc[-2]
+            third_last_supertrend_signal = DATAFRAME['Supertrend Signal'].iloc[-3]
+
+        #      buy flip
+            if third_last_supertrend_signal == -1 and second_last_supertrend_signal == 1 and data.get('flip') <= 2:
+                data['flip'] += 1
+                scriptltp = kite.quote(f"NFO:{symbol}")[f"NFO:{symbol}"]
+                algofox_symbol = f"{data.get('Sym')}|{monthlyexp_al}|{data.get('atm_strike')}|{data.get('Contracttype')}"
+                Algofox.Sell_order_algofox(symbol=algofox_symbol, quantity=int(data.get('lotsize', None)), instrumentType="OPTSTK",
+                                           direction="SELL",
+                                           product="MIS", strategy=strategytag, order_typ=ordertype,
+                                           price=float(scriptltp),
+                                           username=Algofoxid, password=Algofoxpassword, role=role)
+
+
+                ltp = kite.quote(f"NFO:{data.get('NFOSYM')}")[f"NFO:{data.get('NFOSYM')}"]
+                cesymname, pesymname = ATM_CE_AND_PE_SYMBOL(ltp, data.get('Sym'))
+                strike = ATM_CE_AND_PE(ltp, data.get('Sym'))
+                newalgofox_symbol=f"{data.get('Sym')}|{monthlyexp_al}|{strike}|CE"
+                Algofox.Buy_order_algofox(symbol=newalgofox_symbol, quantity=int(data.get('lotsize', None)),
+                                           instrumentType="OPTSTK",
+                                           direction="BUY",
+                                           product="MIS", strategy=strategytag, order_typ=ordertype,
+                                           price=kite.quote(f"NFO:{cesymname}")[f"NFO:{cesymname}"],
+                                           username=Algofoxid, password=Algofoxpassword, role=role)
+                # close previous trade
+                # calculate latest atm
+                #  send order
+                # ce lena h
+                data['atm_strike'] = strike
+                data['Contracttype'] = "CE"
+                print(f"Supertrend flipped buy {symbol} ")
+        #      sell flip
+            if third_last_supertrend_signal == 1 and second_last_supertrend_signal == -1 and data.get('flip') <= 2:
+                data['flip'] += 1
+                print(f"Supertrend flipped buy {symbol} ")
+                # pe lena h
+                algofox_symbol = f"{data.get('Sym')}|{monthlyexp_al}|{data.get('atm_strike')}|{data.get('Contracttype')}"
+                Algofox.Sell_order_algofox(symbol=algofox_symbol, quantity=int(data.get('lotsize', None)),
+                                           instrumentType="OPTSTK",
+                                           direction="SELL",
+                                           product="MIS", strategy=strategytag, order_typ=ordertype,
+                                           price=float(scriptltp),
+                                           username=Algofoxid, password=Algofoxpassword, role=role)
+
+                ltp = kite.quote(f"NFO:{data.get('NFOSYM')}")[f"NFO:{data.get('NFOSYM')}"]
+                cesymname, pesymname = ATM_CE_AND_PE_SYMBOL(ltp, data.get('Sym'))
+                strike = ATM_CE_AND_PE(ltp, data.get('Sym'))
+                newalgofox_symbol = f"{data.get('Sym')}|{monthlyexp_al}|{strike}|PE"
+                Algofox.Buy_order_algofox(symbol=newalgofox_symbol, quantity=int(data.get('lotsize', None)),
+                                          instrumentType="OPTSTK",
+                                          direction="BUY",
+                                          product="MIS", strategy=strategytag, order_typ=ordertype,
+                                          price=kite.quote(f"NFO:{pesymname}")[f"NFO:{pesymname}"],
+                                          username=Algofoxid, password=Algofoxpassword, role=role)
+                data['atm_strike'] = strike
+                data['Contracttype'] = "PE"
+
+
+        if data.get('strategy_mode') == "NSE":
+            print(f"Supertrend calculation started for {data.get('Sym')} ")
+            instoken = get_instrument_token(data.get('Sym'))
+
+            DATAFRAME=get_historical_data(instoken, data.get('NFOSYM'), supertrend_period, supertrend_multiplier)
+            last_supertrend_signal = DATAFRAME['Supertrend Signal'].iloc[-1]
+            second_last_supertrend_signal = DATAFRAME['Supertrend Signal'].iloc[-2]
+            third_last_supertrend_signal = DATAFRAME['Supertrend Signal'].iloc[-3]
+            #      buy flip
+            if third_last_supertrend_signal == -1 and second_last_supertrend_signal == 1 and data.get('flip') <= 2:
+                data['flip'] += 1
+                scriptltp = kite.quote(f"NFO:{symbol}")[f"NFO:{symbol}"]
+                print(f"Supertrend flipped buy {symbol} ")
+                algofox_symbol = f"{data.get('Sym')}|{monthlyexp_al}|{data.get('atm_strike')}|{data.get('Contracttype')}"
+                Algofox.Sell_order_algofox(symbol=algofox_symbol, quantity=int(data.get('lotsize', None)),
+                                           instrumentType="OPTSTK",
+                                           direction="SELL",
+                                           product="MIS", strategy=strategytag, order_typ=ordertype,
+                                           price=float(scriptltp),
+                                           username=Algofoxid, password=Algofoxpassword, role=role)
+
+                ltp = kite.quote(f"NFO:{data.get('NFOSYM')}")[f"NFO:{data.get('NFOSYM')}"]
+                cesymname, pesymname = ATM_CE_AND_PE_SYMBOL(ltp, data.get('Sym'))
+                strike = ATM_CE_AND_PE(ltp, data.get('Sym'))
+                newalgofox_symbol = f"{data.get('Sym')}|{monthlyexp_al}|{strike}|CE"
+                Algofox.Buy_order_algofox(symbol=newalgofox_symbol, quantity=int(data.get('lotsize', None)),
+                                          instrumentType="OPTSTK",
+                                          direction="BUY",
+                                          product="MIS", strategy=strategytag, order_typ=ordertype,
+                                          price=kite.quote(f"NFO:{cesymname}")[f"NFO:{cesymname}"],
+                                          username=Algofoxid, password=Algofoxpassword, role=role)
+                data['atm_strike'] = strike
+                data['Contracttype'] = "CE"
+            #      sell flip
+            if third_last_supertrend_signal == 1 and second_last_supertrend_signal == -1 and data.get('flip') <= 2:
+                data['flip'] += 1
+                print(f"Supertrend flipped buy {symbol} ")
+                # pe lena h
+                algofox_symbol = f"{data.get('Sym')}|{monthlyexp_al}|{data.get('atm_strike')}|{data.get('Contracttype')}"
+                Algofox.Sell_order_algofox(symbol=algofox_symbol, quantity=int(data.get('lotsize', None)),
+                                           instrumentType="OPTSTK",
+                                           direction="SELL",
+                                           product="MIS", strategy=strategytag, order_typ=ordertype,
+                                           price=float(scriptltp),
+                                           username=Algofoxid, password=Algofoxpassword, role=role)
+
+                ltp = kite.quote(f"NFO:{data.get('NFOSYM')}")[f"NFO:{data.get('NFOSYM')}"]
+                cesymname, pesymname = ATM_CE_AND_PE_SYMBOL(ltp, data.get('Sym'))
+                strike = ATM_CE_AND_PE(ltp, data.get('Sym'))
+                newalgofox_symbol = f"{data.get('Sym')}|{monthlyexp_al}|{strike}|PE"
+                Algofox.Buy_order_algofox(symbol=newalgofox_symbol, quantity=int(data.get('lotsize', None)),
+                                          instrumentType="OPTSTK",
+                                          direction="BUY",
+                                          product="MIS", strategy=strategytag, order_typ=ordertype,
+                                          price=kite.quote(f"NFO:{pesymname}")[f"NFO:{pesymname}"],
+                                          username=Algofoxid, password=Algofoxpassword, role=role)
+                data['atm_strike'] = strike
+                data['Contracttype'] = "PE"
+
 
 
 
@@ -701,7 +848,7 @@ def calculate_percentage_values(value, percentage):
 
 
 def mainstrategy():
-    global strattime, stoptime
+    global strattime, stoptime,Signal_dict
     strattime = credentials_dict.get('StartTime')
     stoptime = credentials_dict.get('Stoptime')
 
@@ -732,6 +879,7 @@ def mainstrategy():
         if now >= start_time and functions_executed == True:
             # Rest of the code runs every second
             tp_sl()
+            supertrend_sl(Signal_dict)
             sleep_time.sleep(1)
 
 

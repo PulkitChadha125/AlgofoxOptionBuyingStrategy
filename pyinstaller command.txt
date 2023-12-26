@@ -1,1 +1,1 @@
-pyinstaller --onefile --add-data "Algofox.py;." --add-data "kite_trade.py;." main.py
+pyinstaller --onefile --add-data "Algofox.py;." --add-data "kite_trade.py;." strategy_upgraded.py
