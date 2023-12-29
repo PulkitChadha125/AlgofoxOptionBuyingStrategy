@@ -1,0 +1,2 @@
+29/12/2023 11:29:20 Buy order executed for KOTAKBANK24JAN1930PE for lotsize= 400 @ 55.95 ,Target =100.71000000000001 And Stoploss =51, Condition met = Open is equal to High 
+29/12/2023 11:29:26 Buy order executed for TITAN24JAN3740PE for lotsize= 175 @ 110.1 ,Target =198.18 And Stoploss =101.2, Condition met = Open is equal to High 

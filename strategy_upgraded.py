@@ -3,6 +3,7 @@ from kite_trade import *
 import pyotp
 import pandas as pd
 import json
+import traceback
 import time
 from datetime import datetime, timedelta
 import time as sleep_time
@@ -129,8 +130,10 @@ def extract_and_save_symbols_nfo(input_file, output_file):
         symbols_df.to_csv(output_file, index=False)
         print(f"Unique symbols extracted and saved to {output_file}")
 
+
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+
+        traceback.print_exc()
 
 
 # extract_and_save_symbols_nfo(input_file="Instruments.csv", output_file="UniqueInstrumentsnfo.csv")
@@ -334,9 +337,9 @@ def condition_order_placement():
         if mode == "NSE":
             df = pd.read_csv("UpdatedInstruments.csv")
             unique_symbols = df["nfotradingsymbol"].unique()
-            unique_tradingsymbols = df["tradingsymbol"].unique()
-            symbol_map = {symbol: trading_symbol for symbol, trading_symbol in
-                          zip(unique_symbols, unique_tradingsymbols)}
+            # unique_tradingsymbols = df["tradingsymbol"].unique()
+            # symbol_map = {symbol: trading_symbol for symbol, trading_symbol in
+            #               zip(unique_symbols, unique_tradingsymbols)}
 
         if mode == "NFO":
             df = pd.read_csv("UpdatedInstrumentsnfo.csv")
@@ -400,6 +403,7 @@ def condition_order_placement():
                     pe_atm_C = res['close']
 
                     otm_ce_symbol1 = f"{symbol}{expiery}{otm_ce_strike1}CE"
+                    print(otm_ce_symbol1)
                     res = kite.quote(f"NFO:{otm_ce_symbol1}")[f"NFO:{otm_ce_symbol1}"]['ohlc']
                     otm_ce1_O = res['open']
                     otm_ce1_H = res['high']
@@ -460,10 +464,14 @@ def condition_order_placement():
                             tslstep_val = script_ltp + tslstep_val
                             tslmove_val = (float(tslmove) / 100) * float(script_ltp)
                             tslmove_val = sl + tslmove_val
+                            if mode == 'NSE':
+                                NFOSYM_value = "NULL"
+                            else:
+                                NFOSYM_value = symbol_map.get(symbol)
 
                             trade_details = {
                                 "Sym": symbol,
-                                "NFOSYM":symbol_map.get(symbol),
+                                "NFOSYM":NFOSYM_value,
                                 "exp": expiery,
                                 "atm_strike": atm_strike,
                                 "Contracttype": "PE",
@@ -553,10 +561,10 @@ def condition_order_placement():
 
             except Exception as e:
                 # Handle the exception for the current stock
-                print(f"Error in condition_order_placement for {symbol}: {str(e)}")
+                traceback.print_exc()
                 continue  # Continue to the next stock
     except Exception as e:
-        print(f"Error in condition_order_placement: {e}")
+        traceback.print_exc()
         return
     print("Signal_dict= ", Signal_dict)
 
@@ -578,24 +586,29 @@ def get_instrument_token (Sym):
 
 
 def get_historical_data(Token , sym, supertrend_period , supertrend_multiplier):
+    try:
+        from_datetime = datetime.now() - timedelta(days=5)  # From last 1 day
+        to_datetime = datetime.now()
+        res = kite.historical_data(instrument_token=Token, from_date=from_datetime, to_date=to_datetime,
+                                   interval="2minute", continuous=False, oi=True)
+        price_data = pd.DataFrame(res)
+        price_data = convert_to_human_readable(pd.DataFrame(res))
+        price_data["SYMBOL"] = sym
+        price_data['date'] = pd.to_datetime(price_data['date'])
+        colname = f'SUPERT_{int(supertrend_period)}_{float(supertrend_multiplier)}'
+        colname2 = f'SUPERTd_{int(supertrend_period)}_{float(supertrend_multiplier)}'
 
-    from_datetime = datetime.now() - timedelta(days=5)  # From last 1 day
-    to_datetime = datetime.now()
-    res = kite.historical_data(instrument_token=Token, from_date=from_datetime, to_date=to_datetime,
-                               interval="2minute", continuous=False, oi=True)
-    price_data = pd.DataFrame(res)
-    price_data = convert_to_human_readable(pd.DataFrame(res))
-    price_data["SYMBOL"] = sym
-    price_data['date'] = pd.to_datetime(price_data['date'])
-    colname = f'SUPERT_{int(supertrend_period)}_{float(supertrend_multiplier)}'
-    colname2 = f'SUPERTd_{int(supertrend_period)}_{float(supertrend_multiplier)}'
+        price_data["Supertrend Values"] = ta.supertrend(high=price_data['high'], low=price_data['low'], close=price_data['close'], length=int(supertrend_period),
+                                                multiplier=float(supertrend_multiplier))[colname]
+        price_data["Supertrend Signal"] = ta.supertrend(high=price_data['high'], low=price_data['low'], close=price_data['close'], length=int(supertrend_period),
+                                                multiplier=float(supertrend_multiplier))[colname2]
 
-    price_data["Supertrend Values"] = ta.supertrend(high=price_data['high'], low=price_data['low'], close=price_data['close'], length=int(supertrend_period),
-                                            multiplier=float(supertrend_multiplier))[colname]
-    price_data["Supertrend Signal"] = ta.supertrend(high=price_data['high'], low=price_data['low'], close=price_data['close'], length=int(supertrend_period),
-                                            multiplier=float(supertrend_multiplier))[colname2]
+        return price_data
 
-    return price_data
+    except (IndexError, KeyError) as e:
+        print(f"Error: {e}")
+
+
 def ATM_CE_AND_PE_SYMBOL(ltp,symbol):
     global monthlyexp
     try:
@@ -777,7 +790,6 @@ def tp_sl():
 
     for symbol, data in Signal_dict.items():
         symbol = symbol
-
         target_value = float(data.get('Target', None))
         stop_value = float(data.get('Stop', None))
         tslstep_val = float(data.get('tslstep_val', None))
