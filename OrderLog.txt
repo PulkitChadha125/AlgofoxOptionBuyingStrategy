@@ -1,3 +1,6 @@
 02/01/2024 14:10:40 Buy order executed for POLYCAB24JAN5500PE for lotsize= 100 @ 248.5 ,Target =447.3 And Stoploss =201.7, Condition met = Open is equal to High 
 02/01/2024 14:10:43 Buy order executed for WIPRO24JAN480PE for lotsize= 1500 @ 23.4 ,Target =42.12 And Stoploss =19.5, Condition met = Open is equal to High 
 02/01/2024 14:17:06 Supertrend flipped sell @ POLYCAB24JAN5500PE @ 186.25
+02/01/2024 14:31:14 Supertrend flipped buy @ WIPRO24JAN480PE @ 18.25 
+02/01/2024 14:45:22 Supertrend flipped sell @ WIPRO24JAN480PE @ 18.85
+02/01/2024 15:17:06 Supertrend flipped buy @ POLYCAB24JAN5500PE @ 193.15 
