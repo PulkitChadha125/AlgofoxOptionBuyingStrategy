@@ -721,6 +721,7 @@ def supertrend_sl(Signal_dict):
                     data['Target'] = 0
                     data['Stop'] = 0
                 data['flip'] += 1
+                # flip flap
                 # close previous trade
                 # calculate latest atm
                 #  send order
