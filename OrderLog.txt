@@ -1,6 +1,6 @@
-02/01/2024 14:10:40 Buy order executed for POLYCAB24JAN5500PE for lotsize= 100 @ 248.5 ,Target =447.3 And Stoploss =201.7, Condition met = Open is equal to High 
-02/01/2024 14:10:43 Buy order executed for WIPRO24JAN480PE for lotsize= 1500 @ 23.4 ,Target =42.12 And Stoploss =19.5, Condition met = Open is equal to High 
-02/01/2024 14:17:06 Supertrend flipped sell @ POLYCAB24JAN5500PE @ 186.25
-02/01/2024 14:31:14 Supertrend flipped buy @ WIPRO24JAN480PE @ 18.25 
-02/01/2024 14:45:22 Supertrend flipped sell @ WIPRO24JAN480PE @ 18.85
-02/01/2024 15:17:06 Supertrend flipped buy @ POLYCAB24JAN5500PE @ 193.15 
+03/01/2024 13:17:46 Buy order executed for ABB24JAN4700CE for lotsize= 125 @ 234.55 ,Target =422.19000000000005 And Stoploss =161.95, Condition met = Open is equal to Low 
+03/01/2024 13:17:48 Buy order executed for BHEL24JAN202.5PE for lotsize= 5250 @ 14.3 ,Target =25.740000000000002 And Stoploss =11.6, Condition met = Open is equal to High 
+03/01/2024 13:29:06 Supertrend flipped sell @ ABB24JAN4700CE @ 137.15
+03/01/2024 13:39:07 Supertrend flipped buy @ BHEL|25Jan2024|197|CE @ 10.55 
+03/01/2024 13:59:05 Supertrend flipped sell @ BHEL24JAN202.5PE @ 11.1
+03/01/2024 14:01:05 Supertrend flipped buy @ ABB|25Jan2024|4850|CE @ 144.4 
